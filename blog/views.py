@@ -1,6 +1,8 @@
-from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponse
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import User
+from django.contrib.auth.decorators import login_required
 from django.views.generic import (
 	ListView, 
 	DetailView, 
@@ -8,7 +10,9 @@ from django.views.generic import (
 	UpdateView,
 	DeleteView
 	)
-from .models import Post
+from .models import Post, Comment
+from .forms import CommentForm
+from django.views.generic.edit import FormView
 
 
 
@@ -39,8 +43,23 @@ class UserPostListView(ListView):
 		return Post.objects.filter(author=user).order_by('-date_posted')
 
 
-class PostDetailView(DetailView):
-	model = Post
+def PostDetailView(request, pk, **kwargs):
+	post = Post.objects.get(id=pk)
+	form = CommentForm
+	if request.method == 'POST':
+		form = CommentForm(request.POST)
+		if form.is_valid():
+			comment = form.cleaned_data['comment']
+			comments = Comment.objects.create(comment=comment, post=post, author=request.user)
+			comments.save()
+	comments = Comment.objects.filter(post_id=pk)
+	context = {
+		'form': form,
+		'object': post,
+		'comments': comments
+	}
+	return render(request,'blog/post_detail.html', context)
+
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
